@@ -5,11 +5,24 @@ const reviewButton = document.getElementById('review');
 const settingsButton = document.getElementById('settings');
 const status = document.getElementById('status');
 const message = document.getElementById('message');
+const consentDialog = document.getElementById('consent-dialog');
+const consentCancel = document.getElementById('consent-cancel');
+const consentConfirm = document.getElementById('consent-confirm');
 
 const stored = await chrome.storage.local.get(SETTINGS_KEY);
-const settings = { ...DEFAULT_SETTINGS, ...(stored[SETTINGS_KEY] || {}) };
-status.textContent = settings.typesafeApiKey ? 'Ready' : 'Key needed';
-status.dataset.ready = String(Boolean(settings.typesafeApiKey));
+let settings = { ...DEFAULT_SETTINGS, ...(stored[SETTINGS_KEY] || {}) };
+
+function renderStatus() {
+	const ready = Boolean(settings.typesafeApiKey && settings.dataDisclosureAcceptedAt);
+	status.textContent = ready
+		? 'Ready'
+		: settings.typesafeApiKey
+			? 'Confirm on review'
+			: 'Key needed';
+	status.dataset.ready = String(ready);
+}
+
+renderStatus();
 
 async function activeTab() {
 	const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -40,8 +53,9 @@ async function waitForTab(tabId, expectedUrl, timeout = 20_000) {
 	});
 }
 
-reviewButton.addEventListener('click', async () => {
+async function runReview() {
 	try {
+		message.textContent = '';
 		const tab = await activeTab();
 		const context = await chrome.runtime.sendMessage({
 			type: 'BEEF_GET_CONTEXT',
@@ -61,6 +75,30 @@ reviewButton.addEventListener('click', async () => {
 		window.close();
 	} catch (error) {
 		message.textContent = error.message || 'Could not start the review.';
+	}
+}
+
+reviewButton.addEventListener('click', async () => {
+	if (!settings.dataDisclosureAcceptedAt) {
+		consentDialog.showModal();
+		return;
+	}
+	await runReview();
+});
+
+consentCancel.addEventListener('click', () => consentDialog.close('cancel'));
+consentConfirm.addEventListener('click', async () => {
+	consentConfirm.disabled = true;
+	try {
+		settings = { ...settings, dataDisclosureAcceptedAt: new Date().toISOString() };
+		await chrome.storage.local.set({ [SETTINGS_KEY]: settings });
+		renderStatus();
+		consentDialog.close('accepted');
+		await runReview();
+	} catch (error) {
+		message.textContent = error.message || 'Could not save your confirmation.';
+	} finally {
+		consentConfirm.disabled = false;
 	}
 });
 

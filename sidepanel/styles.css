@@ -35,6 +35,7 @@ input {
 
 button:focus-visible,
 input:focus-visible,
+a:focus-visible,
 summary:focus-visible,
 pre:focus-visible {
 	outline: 2px solid var(--blood);
@@ -171,6 +172,62 @@ summary {
 	font-weight: 700;
 	text-transform: uppercase;
 	cursor: pointer;
+}
+
+.consent-field {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	margin: 2px 0 8px;
+	padding: 11px;
+	align-items: center;
+	gap: 7px 12px;
+	border: 1px solid var(--line);
+	background: rgba(255, 249, 237, 0.58);
+}
+
+.consent-field > span,
+.consent-field > strong,
+.consent-field button {
+	font-family: 'Arial Narrow', 'Helvetica Neue', sans-serif;
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
+}
+
+.consent-field > strong {
+	color: var(--blood);
+}
+
+.consent-field > strong[data-accepted='true'] {
+	color: #267044;
+}
+
+.consent-field button {
+	grid-column: 1 / -1;
+	height: 32px;
+	border: 1px solid var(--ink);
+	background: transparent;
+	cursor: pointer;
+}
+
+.consent-field button:hover {
+	background: var(--ink);
+	color: var(--cream);
+}
+
+.privacy-link {
+	margin: 0 0 14px;
+	color: var(--muted);
+	font-size: 11px;
+	line-height: 1.45;
+}
+
+.privacy-link a {
+	display: inline-block;
+	margin-left: 3px;
+	color: var(--blood-dark);
+	font-weight: 700;
 }
 
 .save-button {

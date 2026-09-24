@@ -24,6 +24,20 @@
 			<p class="message" id="message" aria-live="polite"></p>
 		</main>
 
+		<dialog id="consent-dialog" aria-labelledby="consent-title">
+			<p class="dialog-eyebrow">Before the first review</p>
+			<h2 id="consent-title">Send this PR to TypeSafe?</h2>
+			<p>
+				Beef sends the current PR title, description, filenames, and diff content to TypeSafe AI for
+				classification. This can include private repository code.
+			</p>
+			<a href="../privacy.html" target="_blank">Privacy details ↗</a>
+			<div class="dialog-actions">
+				<button id="consent-cancel" type="button">Cancel</button>
+				<button id="consent-confirm" type="button">Agree &amp; review</button>
+			</div>
+		</dialog>
+
 		<script type="module" src="app.js"></script>
 	</body>
 </html>

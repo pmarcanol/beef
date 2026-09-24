@@ -1,10 +1,21 @@
 import { STATE_KEY } from '../lib/constants.js';
 import { highlightTokens, languageForFilename } from '../lib/highlight.js';
 import { reviewDiffRows, selectReviewFiles } from '../lib/review.js';
+import {
+	buildVirtualOffsets,
+	estimateReviewCardHeight,
+	MAX_INLINE_DIFF_ROWS,
+	VIRTUAL_DIFF_VIEWPORT_PX,
+	virtualIndexAtOffset,
+	virtualRange
+} from '../lib/virtual.js';
 
 const REVIEW_METRICS = [
+	{ key: 'reviewCriticality', label: 'Priority' },
 	{ key: 'reviewRisk', label: 'Risk' },
 	{ key: 'keyLogic', label: 'Key' },
+	{ key: 'databaseRisk', label: 'DB' },
+	{ key: 'validationCatch', label: 'Caught' },
 	{ key: 'relevance', label: 'Relevant' },
 	{ key: 'noop', label: 'No-op' }
 ];
@@ -35,6 +46,13 @@ let state = null;
 let selected = [];
 let currentFileIndex = -1;
 let scrollFrame = null;
+const virtualList = {
+	heights: [],
+	offsets: [0],
+	start: -1,
+	end: -1,
+	measurementFrame: null
+};
 
 function node(tag, className, text) {
 	const element = document.createElement(tag);
@@ -70,13 +88,80 @@ function paneRow(rowData, column, language) {
 	return row;
 }
 
+function rowsForPane(content, rows, column, language, start = 0, end = rows.length) {
+	content.append(...rows.slice(start, end).map((row) => paneRow(row, column, language)));
+}
+
 function diffPane(rows, column, language) {
 	const pane = node('div', 'diff-pane');
 	pane.setAttribute('aria-label', column === 'left' ? 'Before changes' : 'After changes');
 	const content = node('div', 'diff-pane-content');
-	content.append(...rows.map((row) => paneRow(row, column, language)));
+	if (rows.length <= MAX_INLINE_DIFF_ROWS) {
+		rowsForPane(content, rows, column, language);
+		pane.append(content);
+		return pane;
+	}
+
+	pane.classList.add('diff-pane--virtual');
+	pane.style.height = `${VIRTUAL_DIFF_VIEWPORT_PX}px`;
+	const heights = rows.map((row) => (row.kind === 'hunk' || row.kind === 'meta' ? 26 : 18));
+	const offsets = buildVirtualOffsets(heights);
+	const maximumCharacters = rows.reduce((longest, row) => {
+		const text = row.text || row[column]?.text || '';
+		return Math.max(longest, text.length);
+	}, 0);
+	content.style.setProperty(
+		'--virtual-code-width',
+		`${Math.max(0, maximumCharacters * 7.25 + 64)}px`
+	);
+	let renderedStart = -1;
+	let renderedEnd = -1;
+	let rowFrame = null;
+
+	function renderRows() {
+		rowFrame = null;
+		const { start, end } = virtualRange(offsets, pane.scrollTop, pane.clientHeight || 560, 360);
+		if (start === renderedStart && end === renderedEnd) return;
+		renderedStart = start;
+		renderedEnd = end;
+		const topSpacer = node('div', 'virtual-row-spacer');
+		topSpacer.style.height = `${offsets[start]}px`;
+		const bottomSpacer = node('div', 'virtual-row-spacer');
+		bottomSpacer.style.height = `${offsets.at(-1) - offsets[end]}px`;
+		content.replaceChildren(topSpacer);
+		rowsForPane(content, rows, column, language, start, end);
+		content.append(bottomSpacer);
+	}
+
+	pane.addEventListener(
+		'scroll',
+		() => {
+			if (rowFrame === null) rowFrame = requestAnimationFrame(renderRows);
+		},
+		{ passive: true }
+	);
+	pane.renderVirtualRows = renderRows;
+	renderRows();
 	pane.append(content);
 	return pane;
+}
+
+function synchronizeVerticalScroll(left, right) {
+	if (!left?.classList.contains('diff-pane--virtual')) return;
+	for (const [source, target] of [
+		[left, right],
+		[right, left]
+	]) {
+		source.addEventListener(
+			'scroll',
+			() => {
+				if (Math.abs(target.scrollTop - source.scrollTop) <= 1) return;
+				target.scrollTop = source.scrollTop;
+				target.renderVirtualRows?.();
+			},
+			{ passive: true }
+		);
+	}
 }
 
 function fileCard(entry, index) {
@@ -85,6 +170,7 @@ function fileCard(entry, index) {
 	const isAddedFile = file.status === 'added';
 	const card = node('article', 'diff-card');
 	card.id = `review-file-${index + 1}`;
+	card.dataset.virtualIndex = String(index);
 	card.dataset.tier = tier.key;
 	card.dataset.language = language.id;
 	card.dataset.layout = isAddedFile ? 'full' : 'split';
@@ -119,13 +205,92 @@ function fileCard(entry, index) {
 		const rows = reviewDiffRows(file.patch);
 		if (rows.length) {
 			if (isAddedFile) diff.append(diffPane(rows, 'right', language.id));
-			else diff.append(diffPane(rows, 'left', language.id), diffPane(rows, 'right', language.id));
+			else {
+				const left = diffPane(rows, 'left', language.id);
+				const right = diffPane(rows, 'right', language.id);
+				synchronizeVerticalScroll(left, right);
+				diff.append(left, right);
+			}
 		} else
 			diff.append(node('div', 'missing-notice', 'No textual patch is available for this file.'));
 	}
 
 	card.append(header, scores, diff);
 	return card;
+}
+
+function stackContentTop() {
+	const stack = elements['diff-stack'];
+	const paddingTop = Number.parseFloat(getComputedStyle(stack).paddingTop) || 0;
+	return window.scrollY + stack.getBoundingClientRect().top + paddingTop;
+}
+
+function resetVirtualList() {
+	if (virtualList.measurementFrame !== null) cancelAnimationFrame(virtualList.measurementFrame);
+	virtualList.measurementFrame = null;
+	virtualList.heights = selected.map(estimateReviewCardHeight);
+	virtualList.offsets = buildVirtualOffsets(virtualList.heights);
+	virtualList.start = -1;
+	virtualList.end = -1;
+}
+
+function measureVirtualWindow() {
+	virtualList.measurementFrame = null;
+	const stackTop = stackContentTop();
+	const readingOffset = Math.max(0, window.scrollY + 72 - stackTop);
+	const anchorIndex = virtualIndexAtOffset(virtualList.offsets, readingOffset);
+	const anchorWithin = readingOffset - virtualList.offsets[anchorIndex];
+	let changed = false;
+
+	for (const card of elements['diff-stack'].querySelectorAll('.diff-card')) {
+		const index = Number(card.dataset.virtualIndex);
+		const marginBottom = Number.parseFloat(getComputedStyle(card).marginBottom) || 0;
+		const measured = Math.ceil(card.getBoundingClientRect().height + marginBottom);
+		if (Number.isInteger(index) && Math.abs(measured - virtualList.heights[index]) > 1) {
+			virtualList.heights[index] = measured;
+			changed = true;
+		}
+	}
+	if (!changed) return;
+
+	virtualList.offsets = buildVirtualOffsets(virtualList.heights);
+	const nextScrollTop = stackContentTop() + virtualList.offsets[anchorIndex] + anchorWithin - 72;
+	if (Math.abs(nextScrollTop - window.scrollY) > 1) window.scrollTo(0, nextScrollTop);
+	virtualList.start = -1;
+	virtualList.end = -1;
+	renderVirtualWindow(true);
+}
+
+function renderVirtualWindow(force = false) {
+	if (!selected.length || elements['review-layout'].hidden) return;
+	const viewportTop = Math.max(0, window.scrollY - stackContentTop());
+	const { start, end } = virtualRange(virtualList.offsets, viewportTop, window.innerHeight);
+	if (!force && start === virtualList.start && end === virtualList.end) return;
+	virtualList.start = start;
+	virtualList.end = end;
+
+	const topSpacer = node('div', 'virtual-spacer');
+	topSpacer.style.height = `${virtualList.offsets[start]}px`;
+	topSpacer.setAttribute('aria-hidden', 'true');
+	const windowElement = node('div', 'virtual-window');
+	windowElement.append(
+		...selected.slice(start, end).map((entry, localIndex) => fileCard(entry, start + localIndex))
+	);
+	const bottomSpacer = node('div', 'virtual-spacer');
+	bottomSpacer.style.height = `${virtualList.offsets.at(-1) - virtualList.offsets[end]}px`;
+	bottomSpacer.setAttribute('aria-hidden', 'true');
+	elements['diff-stack'].replaceChildren(topSpacer, windowElement, bottomSpacer);
+
+	if (virtualList.measurementFrame !== null) cancelAnimationFrame(virtualList.measurementFrame);
+	virtualList.measurementFrame = requestAnimationFrame(measureVirtualWindow);
+}
+
+function scrollToFile(index) {
+	const nextIndex = Math.max(0, Math.min(index, selected.length - 1));
+	const top = stackContentTop() + virtualList.offsets[nextIndex] - 64;
+	window.scrollTo({ top, behavior: 'auto' });
+	setCurrentFile(nextIndex);
+	renderVirtualWindow();
 }
 
 function renderEmpty(title, copy) {
@@ -180,15 +345,10 @@ function setCurrentFile(index) {
 
 function updateCurrentFile() {
 	scrollFrame = null;
-	const cards = [...elements['diff-stack'].querySelectorAll('.diff-card')];
-	if (!cards.length || elements['review-layout'].hidden) return;
-	const readingLine = 72;
-	let index = 0;
-	for (const [cardIndex, card] of cards.entries()) {
-		if (card.getBoundingClientRect().top > readingLine) break;
-		index = cardIndex;
-	}
-	setCurrentFile(index);
+	if (!selected.length || elements['review-layout'].hidden) return;
+	const readingOffset = Math.max(0, window.scrollY + 72 - stackContentTop());
+	setCurrentFile(virtualIndexAtOffset(virtualList.offsets, readingOffset));
+	renderVirtualWindow();
 }
 
 function scheduleCurrentFileUpdate() {
@@ -230,6 +390,11 @@ function render() {
 		...selected.map(({ file }, index) => {
 			const link = document.createElement('a');
 			link.href = `#review-file-${index + 1}`;
+			link.addEventListener('click', (event) => {
+				event.preventDefault();
+				scrollToFile(index);
+				history.replaceState(null, '', link.href);
+			});
 			link.append(
 				node('span', '', String(index + 1).padStart(2, '0')),
 				node('span', '', file.filename)
@@ -237,7 +402,8 @@ function render() {
 			return link;
 		})
 	);
-	elements['diff-stack'].replaceChildren(...selected.map(fileCard));
+	resetVirtualList();
+	renderVirtualWindow(true);
 	currentFileIndex = -1;
 	scheduleCurrentFileUpdate();
 }

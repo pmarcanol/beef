@@ -20,11 +20,12 @@ await page.goto(`chrome-extension://${extensionId}/sidepanel/index.html`);
 await page.evaluate(async () => {
 	await chrome.storage.local.set({
 		beefSettings: {
-			typesafeApiKey: 'local-test-key'
+			typesafeApiKey: 'local-test-key',
+			dataDisclosureAcceptedAt: '2026-09-24T10:00:00.000Z'
 		},
 		beefState: {
 			schemaVersion: 1,
-			appVersion: '0.7.1',
+			appVersion: '1.3.0',
 			phase: 'complete',
 			startedAt: '2026-09-24T11:00:00.000Z',
 			updatedAt: '2026-09-24T11:00:03.000Z',
@@ -85,19 +86,28 @@ index aaaaaaa..bbbbbbb 100644
 						noop: 0.03,
 						relevance: 0.98,
 						keyLogic: 0.96,
-						reviewRisk: 0.91
+						reviewRisk: 0.91,
+						validationCatch: 0.18,
+						databaseRisk: 0.02,
+						reviewCriticality: 0.84
 					},
 					'src/runtime/request.ts': {
 						noop: 0.08,
 						relevance: 0.94,
 						keyLogic: 0.83,
-						reviewRisk: 0.72
+						reviewRisk: 0.72,
+						validationCatch: 0.22,
+						databaseRisk: 0.01,
+						reviewCriticality: 0.7
 					},
 					'tests/retry-policy.test.ts': {
 						noop: 0.12,
 						relevance: 0.86,
 						keyLogic: 0.76,
-						reviewRisk: 0.71
+						reviewRisk: 0.71,
+						validationCatch: 0.1,
+						databaseRisk: 0.01,
+						reviewCriticality: 0.71
 					}
 				}
 			},
@@ -190,13 +200,135 @@ await review.setViewportSize({ width: 1440, height: 1000 });
 await review.evaluate(() => window.scrollTo(0, 0));
 await review.screenshot({ path: '/tmp/beef-review.png', fullPage: true });
 
+await review.evaluate(async () => {
+	const stored = await chrome.storage.local.get('beefState');
+	const base = stored.beefState;
+	const files = Array.from({ length: 160 }, (_, index) => ({
+		filename: `src/generated/file-${String(index + 1).padStart(3, '0')}.ts`,
+		status: index % 5 === 0 ? 'added' : 'modified',
+		additions: 2,
+		deletions: index % 5 === 0 ? 0 : 1,
+		patch: `diff --git a/src/generated/file-${index}.ts b/src/generated/file-${index}.ts\n--- a/src/generated/file-${index}.ts\n+++ b/src/generated/file-${index}.ts\n@@ -1 +1,2 @@\n-export const value = ${index}\n+export const value = ${index + 1}\n+export const reviewed = true`
+	}));
+	const byFile = Object.fromEntries(
+		files.map((file) => [
+			file.filename,
+			{
+				noop: 0.03,
+				relevance: 0.98,
+				keyLogic: 0.94,
+				reviewRisk: 0.88,
+				validationCatch: 0.1,
+				databaseRisk: 0.01,
+				reviewCriticality: 0.87
+			}
+		])
+	);
+	await chrome.storage.local.set({
+		beefState: {
+			...base,
+			files,
+			analysis: { totalFiles: files.length, completedFiles: files.length, byFile }
+		}
+	});
+});
+await review.reload();
+await review.locator('#file-nav a').nth(159).waitFor();
+assert.equal(await review.locator('#file-nav a').count(), 160);
+assert.ok((await review.locator('.diff-card').count()) < 30);
+await review.locator('#file-nav a').nth(120).click();
+await review.locator('#review-file-121').waitFor();
+await review.waitForFunction(
+	() =>
+		document.querySelector('#file-nav a.is-current')?.getAttribute('href') === '#review-file-121'
+);
+assert.equal(
+	await review.locator('#file-nav a.is-current').getAttribute('href'),
+	'#review-file-121'
+);
+assert.ok((await review.locator('.diff-card').count()) < 30);
+
+await review.evaluate(async () => {
+	const stored = await chrome.storage.local.get('beefState');
+	const filename = 'src/generated/huge-generated-file.ts';
+	const changes = Array.from(
+		{ length: 1200 },
+		(_, index) =>
+			`-export const oldValue${index} = ${index}\n+export const newValue${index} = ${index + 1}`
+	).join('\n');
+	const file = {
+		filename,
+		status: 'modified',
+		additions: 1200,
+		deletions: 1200,
+		patch: `diff --git a/${filename} b/${filename}\n--- a/${filename}\n+++ b/${filename}\n@@ -1,1200 +1,1200 @@\n${changes}`
+	};
+	await chrome.storage.local.set({
+		beefState: {
+			...stored.beefState,
+			files: [file],
+			analysis: {
+				totalFiles: 1,
+				completedFiles: 1,
+				byFile: {
+					[filename]: {
+						noop: 0.02,
+						relevance: 0.99,
+						keyLogic: 0.98,
+						reviewRisk: 0.94,
+						validationCatch: 0.05,
+						databaseRisk: 0.01,
+						reviewCriticality: 0.95
+					}
+				}
+			}
+		}
+	});
+});
+await review.reload();
+await review.locator('.diff-pane--virtual').first().waitFor();
+assert.equal(await review.locator('.diff-pane--virtual').count(), 2);
+assert.ok((await review.locator('.pane-row').count()) < 160);
+await review
+	.locator('.diff-pane--virtual')
+	.first()
+	.evaluate((pane) => {
+		pane.scrollTop = 4200;
+	});
+await review.waitForFunction(() => {
+	const panes = [...document.querySelectorAll('.diff-pane--virtual')];
+	return panes.length === 2 && panes[0].scrollTop > 0 && panes[0].scrollTop === panes[1].scrollTop;
+});
+assert.ok((await review.locator('.pane-row').count()) < 160);
+
 const popup = await context.newPage();
-await popup.setViewportSize({ width: 310, height: 220 });
+await popup.setViewportSize({ width: 310, height: 360 });
 await popup.goto(`chrome-extension://${extensionId}/popup/index.html`);
+await popup.evaluate(async () => {
+	const { beefSettings } = await chrome.storage.local.get('beefSettings');
+	await chrome.storage.local.set({
+		beefSettings: { ...beefSettings, dataDisclosureAcceptedAt: null }
+	});
+});
+await popup.reload();
 await popup.locator('#review').waitFor();
 await popup.screenshot({ path: '/tmp/beef-popup.png', fullPage: true });
 const popupStatus = await popup.locator('#status').innerText();
 const popupButtons = await popup.locator('main button').count();
+assert.equal(popupStatus, 'CONFIRM ON REVIEW');
+
+await popup.locator('#review').click();
+await popup.locator('#consent-dialog[open]').waitFor();
+assert.equal(await popup.locator('.dialog-actions button').count(), 2);
+await popup.screenshot({ path: '/tmp/beef-consent.png', fullPage: true });
+await popup.locator('#consent-confirm').click();
+await popup.waitForFunction(() => !document.querySelector('#consent-dialog')?.open);
+const acceptedAt = await popup.evaluate(async () => {
+	const { beefSettings } = await chrome.storage.local.get('beefSettings');
+	return beefSettings.dataDisclosureAcceptedAt;
+});
+assert.ok(acceptedAt);
+assert.equal(await popup.locator('#status').innerText(), 'READY');
 
 const settingsPageOpened = context.waitForEvent('page');
 await popup.locator('#settings').click();
@@ -216,6 +348,7 @@ console.log(
 			'/tmp/beef-settings.png',
 			'/tmp/beef-history.png',
 			'/tmp/beef-popup.png',
+			'/tmp/beef-consent.png',
 			'/tmp/beef-review.png'
 		]
 	})

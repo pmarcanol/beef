@@ -1,4 +1,5 @@
 import { DEFAULT_SETTINGS, SETTINGS_KEY, STATE_KEY } from '../lib/constants.js';
+import { selectReviewFiles } from '../lib/review.js';
 import { summarizeState } from '../lib/state.js';
 
 const elements = Object.fromEntries(
@@ -6,6 +7,8 @@ const elements = Object.fromEntries(
 		'status',
 		'settings-form',
 		'typesafe-key',
+		'consent-status',
+		'reset-consent',
 		'toggle-key',
 		'form-status',
 		'empty-history',
@@ -46,6 +49,10 @@ function phaseLabel(phase) {
 
 function renderSettings() {
 	elements['typesafe-key'].value = settings.typesafeApiKey || '';
+	const accepted = Boolean(settings.dataDisclosureAcceptedAt);
+	elements['consent-status'].textContent = accepted ? 'Confirmed' : 'Not confirmed';
+	elements['consent-status'].dataset.accepted = String(accepted);
+	elements['reset-consent'].hidden = !accepted;
 }
 
 function renderHistory() {
@@ -57,9 +64,7 @@ function renderHistory() {
 	if (!hasRun) return;
 
 	const summary = summarizeState(state);
-	const selected = Object.values(state.analysis?.byFile || {}).filter(
-		(result) => result.reviewRisk >= 0.65 || result.keyLogic >= 0.65
-	).length;
+	const selected = selectReviewFiles(state).length;
 	elements['run-identity'].textContent = state.pr
 		? `${state.pr.owner}/${state.pr.repo} #${state.pr.number}`
 		: phaseLabel(state.phase);
@@ -129,10 +134,18 @@ elements['toggle-key'].addEventListener('click', () => {
 elements['settings-form'].addEventListener('submit', async (event) => {
 	event.preventDefault();
 	settings = {
+		...settings,
 		typesafeApiKey: elements['typesafe-key'].value.trim()
 	};
 	await chrome.storage.local.set({ [SETTINGS_KEY]: settings });
 	elements['form-status'].textContent = 'Saved.';
+	setTimeout(() => (elements['form-status'].textContent = ''), 1200);
+});
+
+elements['reset-consent'].addEventListener('click', async () => {
+	settings = { ...settings, dataDisclosureAcceptedAt: null };
+	await chrome.storage.local.set({ [SETTINGS_KEY]: settings });
+	elements['form-status'].textContent = 'Confirmation reset.';
 	setTimeout(() => (elements['form-status'].textContent = ''), 1200);
 });
 

@@ -258,6 +258,15 @@ aside {
 	background: rgba(255, 249, 237, 0.3);
 }
 
+.virtual-window {
+	min-width: 0;
+}
+
+.virtual-spacer {
+	width: 1px;
+	pointer-events: none;
+}
+
 .diff-card {
 	margin: 0 0 16px;
 	border: 1px solid var(--ink);
@@ -266,7 +275,8 @@ aside {
 	scroll-margin-top: 64px;
 }
 
-.diff-card[data-tier='risk'] {
+.diff-card[data-tier='risk'],
+.diff-card[data-tier='database'] {
 	box-shadow: 3px 3px 0 var(--blood-dark);
 }
 
@@ -313,7 +323,8 @@ aside {
 	white-space: nowrap;
 }
 
-.diff-card[data-tier='risk'] .tier-badge {
+.diff-card[data-tier='risk'] .tier-badge,
+.diff-card[data-tier='database'] .tier-badge {
 	border-color: var(--blood);
 	background: var(--blood);
 	color: var(--cream);
@@ -321,6 +332,7 @@ aside {
 
 .score-strip {
 	display: flex;
+	flex-wrap: wrap;
 	padding: 5px 10px;
 	gap: 5px;
 	border-bottom: 1px solid var(--line);
@@ -364,6 +376,11 @@ aside {
 	scrollbar-width: thin;
 }
 
+.diff-pane--virtual {
+	overflow: auto;
+	overscroll-behavior: contain;
+}
+
 .diff-pane::-webkit-scrollbar {
 	height: 10px;
 }
@@ -385,6 +402,15 @@ aside {
 .diff-pane-content {
 	width: max-content;
 	min-width: 100%;
+}
+
+.diff-pane--virtual .diff-pane-content {
+	min-width: max(100%, var(--virtual-code-width));
+}
+
+.virtual-row-spacer {
+	width: 1px;
+	pointer-events: none;
 }
 
 .pane-row {

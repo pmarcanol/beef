@@ -186,14 +186,18 @@
 			element.querySelector(`.${BADGE_CLASS}`)?.remove();
 			const badge = document.createElement('span');
 			badge.className = BADGE_CLASS;
-			if (value.reviewRisk >= 0.65) {
+			const criticality = value.reviewCriticality ?? value.reviewRisk ?? 0;
+			if ((value.databaseRisk || 0) >= 0.65) {
 				badge.dataset.level = 'high';
-				badge.textContent = `beef · review ${Math.round(value.reviewRisk * 100)}%`;
+				badge.textContent = `beef · database ${Math.round(value.databaseRisk * 100)}%`;
+			} else if (criticality >= 0.65) {
+				badge.dataset.level = 'high';
+				badge.textContent = `beef · review ${Math.round(criticality * 100)}%`;
 			} else if (value.noop >= 0.65) {
 				badge.dataset.level = 'skip';
 				badge.textContent = `beef · low logic ${Math.round(value.noop * 100)}%`;
 			} else {
-				badge.textContent = `beef · risk ${Math.round(value.reviewRisk * 100)}%`;
+				badge.textContent = `beef · priority ${Math.round(criticality * 100)}%`;
 			}
 			const mount = element.querySelector('.file-info, [data-testid="file-header"]');
 			mount?.append(badge);

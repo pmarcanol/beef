@@ -30,6 +30,11 @@ button:focus-visible {
 	outline-offset: 2px;
 }
 
+a:focus-visible {
+	outline: 2px solid var(--blood);
+	outline-offset: 2px;
+}
+
 header {
 	display: flex;
 	height: 50px;
@@ -124,4 +129,86 @@ main {
 
 .message:empty {
 	display: none;
+}
+
+dialog {
+	width: 286px;
+	max-width: calc(100% - 16px);
+	margin: auto;
+	padding: 14px;
+	border: 1px solid var(--ink);
+	border-radius: 0;
+	background: var(--paper);
+	box-shadow: 5px 5px 0 var(--blood-dark);
+	color: var(--ink);
+}
+
+dialog::backdrop {
+	background: rgba(24, 23, 19, 0.72);
+}
+
+.dialog-eyebrow {
+	margin: 0 0 6px;
+	color: var(--blood);
+	font-family: 'Arial Narrow', 'Helvetica Neue', sans-serif;
+	font-size: 8px;
+	font-weight: 700;
+	letter-spacing: 0.09em;
+	text-transform: uppercase;
+}
+
+dialog h2 {
+	margin: 0;
+	font-size: 25px;
+	letter-spacing: -0.045em;
+	line-height: 1;
+}
+
+dialog > p:not(.dialog-eyebrow) {
+	margin: 10px 0 8px;
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+dialog > a {
+	color: var(--blood-dark);
+	font-family: 'Arial Narrow', 'Helvetica Neue', sans-serif;
+	font-size: 9px;
+	font-weight: 700;
+	text-transform: uppercase;
+}
+
+.dialog-actions {
+	display: grid;
+	grid-template-columns: 0.8fr 1.2fr;
+	margin-top: 13px;
+	border: 1px solid var(--ink);
+}
+
+.dialog-actions button {
+	height: 38px;
+	border: 0;
+	background: transparent;
+	font-family: 'Arial Narrow', 'Helvetica Neue', sans-serif;
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.dialog-actions button + button {
+	border-left: 1px solid var(--ink);
+	background: var(--blood);
+	color: var(--cream);
+}
+
+.dialog-actions button:hover {
+	background: var(--ink);
+	color: var(--cream);
+}
+
+.dialog-actions button:disabled {
+	opacity: 0.55;
+	cursor: wait;
 }

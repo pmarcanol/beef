@@ -165,6 +165,8 @@ async function runAnalysis(sourceTabId) {
 	const settings = await getSettings();
 	if (!settings.typesafeApiKey)
 		throw new Error('Add a TypeSafe API key in Settings before grading this PR.');
+	if (!settings.dataDisclosureAcceptedAt)
+		throw new Error('Confirm data sharing from the Beef popup before grading this PR.');
 
 	const state = initialState({
 		phase: 'collecting',

@@ -15,8 +15,14 @@ import {
 	isOversizedJevError,
 	splitFilesByWeight
 } from '../lib/jev.js';
-import { reviewDiffLines, reviewDiffRows, selectReviewFiles } from '../lib/review.js';
+import {
+	adjustedReviewSignals,
+	reviewDiffLines,
+	reviewDiffRows,
+	selectReviewFiles
+} from '../lib/review.js';
 import { initialState, summarizeState } from '../lib/state.js';
+import { buildVirtualOffsets, virtualIndexAtOffset, virtualRange } from '../lib/virtual.js';
 
 const pr = {
 	owner: 'openai',
@@ -87,13 +93,17 @@ test('parses a GitHub PR URL from overview and files views', () => {
 	assert.equal(parsePullRequestUrl('https://github.com/openai/codex/issues/42'), null);
 });
 
-test('builds four independent Noul questions for every file', () => {
+test('builds six independent Noul questions for every file', () => {
 	const { questions, mapping } = buildQuestions(files);
-	assert.equal(Object.keys(questions).length, 8);
+	assert.equal(Object.keys(questions).length, 12);
 	assert.equal(questions.f0__noop.type, 'noul');
 	assert.equal(questions.f0__relevance.type, 'noul');
 	assert.equal(questions.f0__key_logic.type, 'noul');
 	assert.equal(questions.f0__review_risk.type, 'noul');
+	assert.equal(questions.f0__validation_catch.type, 'noul');
+	assert.match(questions.f0__validation_catch.instructions, /ordinary validation/);
+	assert.equal(questions.f0__database_risk.type, 'noul');
+	assert.match(questions.f0__database_risk.criteria.true, /Additive tables and columns/);
 	assert.match(questions.f1__noop.instructions, /state\.files\[1\]/);
 	assert.equal(mapping.f1, 'README.md');
 });
@@ -213,15 +223,78 @@ test('maps raw Noul answers back to filenames', () => {
 			f0__noop: { type: 'noul', noul: 0.05 },
 			f0__relevance: { type: 'noul', noul: 0.97 },
 			f0__key_logic: { type: 'noul', noul: 0.91 },
-			f0__review_risk: { type: 'noul', noul: 0.82 }
+			f0__review_risk: { type: 'noul', noul: 0.82 },
+			f0__validation_catch: { type: 'noul', noul: 0.9 },
+			f0__database_risk: { type: 'noul', noul: 0.02 }
 		}
 	};
+	const multiplier = 1 - 0.9 * 0.7;
 	assert.deepEqual(answersForFiles([files[0]], response)['src/retry.ts'], {
 		noop: 0.05,
 		relevance: 0.97,
 		keyLogic: 0.91,
-		reviewRisk: 0.82
+		reviewRisk: 0.82,
+		validationCatch: 0.9,
+		databaseRisk: 0.02,
+		adjustedReviewRisk: 0.82 * multiplier,
+		adjustedKeyLogic: 0.91 * multiplier,
+		reviewCriticality: 0.91 * multiplier
 	});
+});
+
+test('database schema and data changes bypass the validation discount', () => {
+	const migrationSignals = {
+		noop: 0.05,
+		relevance: 0.88,
+		keyLogic: 0.4,
+		reviewRisk: 0.5,
+		validationCatch: 0.98,
+		databaseRisk: 0.93
+	};
+	const adjusted = adjustedReviewSignals(migrationSignals);
+	assert.equal(adjusted.reviewCriticality, 0.93);
+	const selected = selectReviewFiles({
+		files: [{ filename: 'migrations/20260924_add_account_status.sql' }],
+		analysis: {
+			byFile: {
+				'migrations/20260924_add_account_status.sql': migrationSignals
+			}
+		}
+	});
+	assert.equal(selected.length, 1);
+	assert.equal(selected[0].tier.key, 'database');
+	assert.equal(selected[0].tier.label, 'Database risk');
+});
+
+test('lowers review criticality when ordinary validation is likely to catch a defect', () => {
+	const cssSignals = {
+		noop: 0.82,
+		relevance: 0.9,
+		keyLogic: 0.86,
+		reviewRisk: 0.91,
+		validationCatch: 0.95
+	};
+	const adjusted = adjustedReviewSignals(cssSignals);
+	assert.ok(adjusted.adjustedReviewRisk < 0.4);
+	assert.ok(adjusted.adjustedKeyLogic < 0.4);
+	assert.equal(
+		selectReviewFiles({
+			files: [{ filename: 'styles/layout.css' }],
+			analysis: { byFile: { 'styles/layout.css': cssSignals } }
+		}).length,
+		0
+	);
+	assert.equal(
+		selectReviewFiles({
+			files: [{ filename: 'src/payments.ts' }],
+			analysis: {
+				byFile: {
+					'src/payments.ts': { ...cssSignals, validationCatch: 0.05, noop: 0.02 }
+				}
+			}
+		}).length,
+		1
+	);
 });
 
 test('selects syntax highlighting from the filename', () => {
@@ -237,6 +310,14 @@ test('selects syntax highlighting from the filename', () => {
 			.join('|'),
 		'keyword:const|number:3|comment:// bounded'
 	);
+});
+
+test('calculates a bounded virtual review window', () => {
+	const offsets = buildVirtualOffsets(Array.from({ length: 100 }, () => 200));
+	assert.equal(offsets.at(-1), 20_000);
+	assert.equal(virtualIndexAtOffset(offsets, 0), 0);
+	assert.equal(virtualIndexAtOffset(offsets, 2_050), 10);
+	assert.deepEqual(virtualRange(offsets, 10_000, 800, 400), { start: 48, end: 57 });
 });
 
 test('merges browser-page metadata with the raw .diff collection', () => {
