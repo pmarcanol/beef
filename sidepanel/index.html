@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="color-scheme" content="light" />
+		<title>Beef settings</title>
+		<link rel="stylesheet" href="styles.css" />
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="brand"><span class="brand-mark" aria-hidden="true">B</span><b>beef</b></div>
+			<span class="status" id="status">Idle</span>
+		</header>
+
+		<nav class="tabs" aria-label="Settings views">
+			<button class="tab is-active" type="button" data-tab="settings">Settings</button>
+			<button class="tab" type="button" data-tab="history">Run history</button>
+		</nav>
+
+		<main>
+			<section class="panel settings-panel" data-panel="settings">
+				<form id="settings-form">
+					<label class="field key-field">
+						<span>Jev key</span>
+						<span class="input-row">
+							<input
+								id="typesafe-key"
+								type="password"
+								placeholder="Paste TypeSafe API key"
+								autocomplete="off"
+							/>
+							<button id="toggle-key" type="button">Show</button>
+						</span>
+					</label>
+					<button class="save-button" type="submit"><span>Save</span><span>✓</span></button>
+					<p class="form-status" id="form-status" aria-live="polite"></p>
+				</form>
+			</section>
+
+			<section class="panel history-panel" data-panel="history" hidden>
+				<p class="empty-history" id="empty-history">No run yet.</p>
+				<div id="run-history" hidden>
+					<header class="run-header">
+						<span id="run-identity"></span>
+						<h1 id="run-title"></h1>
+						<time id="run-time"></time>
+					</header>
+					<div class="run-stats" id="run-stats"></div>
+					<ol class="batch-history" id="batch-history"></ol>
+					<details>
+						<summary>Full state</summary>
+						<pre id="state-json" tabindex="0"></pre>
+					</details>
+					<div class="history-actions">
+						<button id="copy-state" type="button">Copy</button>
+						<button id="export-state" type="button">Export</button>
+						<button id="clear-state" type="button">Clear</button>
+					</div>
+				</div>
+			</section>
+		</main>
+
+		<script type="module" src="app.js"></script>
+	</body>
+</html>

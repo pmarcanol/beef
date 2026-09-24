@@ -1,0 +1,27 @@
+{
+	"manifest_version": 3,
+	"name": "beef",
+	"version": "0.7.1",
+	"description": "Triage the GitHub pull request in front of you with Jev.",
+	"permissions": ["activeTab", "scripting", "storage", "tabs", "unlimitedStorage"],
+	"host_permissions": [
+		"https://github.com/*",
+		"https://patch-diff.githubusercontent.com/*",
+		"https://api.typesafe.ai/*"
+	],
+	"background": {
+		"service_worker": "background.js",
+		"type": "module"
+	},
+	"action": {
+		"default_title": "beef",
+		"default_popup": "popup/index.html"
+	},
+	"content_scripts": [
+		{
+			"matches": ["https://github.com/*/*/pull/*"],
+			"js": ["content.js"],
+			"run_at": "document_idle"
+		}
+	]
+}

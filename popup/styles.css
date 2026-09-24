@@ -1,0 +1,127 @@
+:root {
+	font-family: Georgia, 'Times New Roman', serif;
+	color: #181713;
+	background: #f5eddd;
+	font-synthesis: none;
+	--blood: #951f17;
+	--blood-dark: #64120e;
+	--ink: #181713;
+	--paper: #f5eddd;
+	--cream: #fff9ed;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	width: 310px;
+	margin: 0;
+	background: linear-gradient(rgba(24, 23, 19, 0.025) 1px, transparent 1px), var(--paper);
+	background-size: 100% 6px;
+}
+
+button {
+	font: inherit;
+}
+
+button:focus-visible {
+	outline: 2px solid var(--blood);
+	outline-offset: 2px;
+}
+
+header {
+	display: flex;
+	height: 50px;
+	padding: 7px 10px;
+	align-items: center;
+	gap: 8px;
+	border-bottom: 1px solid var(--ink);
+}
+
+.brand-mark {
+	display: grid;
+	width: 30px;
+	height: 30px;
+	place-items: center;
+	border-radius: 50% 44% 48% 46%;
+	background: var(--blood);
+	color: var(--cream);
+	font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+	font-size: 18px;
+	transform: rotate(-7deg);
+}
+
+header strong {
+	font-size: 21px;
+	letter-spacing: -0.06em;
+}
+
+.status {
+	margin-left: auto;
+	color: var(--blood);
+	font-family: 'Arial Narrow', 'Helvetica Neue', sans-serif;
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.status[data-ready='true'] {
+	color: #267044;
+}
+
+main {
+	display: grid;
+	gap: 7px;
+	padding: 10px;
+}
+
+.review-button,
+.settings-button {
+	display: flex;
+	width: 100%;
+	height: 44px;
+	padding: 0 12px;
+	align-items: center;
+	justify-content: space-between;
+	border: 1px solid var(--ink);
+	font-family: 'Arial Narrow', 'Helvetica Neue', sans-serif;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.09em;
+	text-transform: uppercase;
+	cursor: pointer;
+}
+
+.review-button {
+	border-color: var(--blood-dark);
+	background: var(--blood);
+	color: var(--cream);
+}
+
+.settings-button {
+	background: transparent;
+	color: var(--ink);
+}
+
+.review-button:hover {
+	background: var(--blood-dark);
+}
+
+.settings-button:hover {
+	background: var(--ink);
+	color: var(--cream);
+}
+
+.message {
+	margin: 0;
+	color: var(--blood);
+	font-family: 'Arial Narrow', 'Helvetica Neue', sans-serif;
+	font-size: 10px;
+	text-align: center;
+}
+
+.message:empty {
+	display: none;
+}

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="color-scheme" content="light" />
+		<title>beef</title>
+		<link rel="stylesheet" href="styles.css" />
+	</head>
+	<body>
+		<header>
+			<span class="brand-mark" aria-hidden="true">B</span>
+			<strong>beef</strong>
+			<span class="status" id="status">Ready</span>
+		</header>
+
+		<main>
+			<button class="review-button" id="review" type="button">
+				<span>Review</span><span aria-hidden="true">→</span>
+			</button>
+			<button class="settings-button" id="settings" type="button">
+				<span>Settings</span><span aria-hidden="true">↗</span>
+			</button>
+			<p class="message" id="message" aria-live="polite"></p>
+		</main>
+
+		<script type="module" src="app.js"></script>
+	</body>
+</html>

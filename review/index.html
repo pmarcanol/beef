@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="color-scheme" content="light" />
+		<title>Beef review cut</title>
+		<link rel="stylesheet" href="styles.css" />
+	</head>
+	<body>
+		<header class="site-header">
+			<a class="brand" href="#top" aria-label="Beef review cut">
+				<span class="brand-mark" aria-hidden="true">B</span>
+				<b>beef</b>
+			</a>
+			<div class="header-actions">
+				<button id="copy-review" type="button">Copy</button>
+				<button id="refresh-review" type="button">Refresh</button>
+				<a id="github-link" href="https://github.com" target="_blank" rel="noreferrer">GitHub ↗</a>
+			</div>
+		</header>
+
+		<main id="top">
+			<section class="running-state" id="running-state" hidden>
+				<h1 id="running-title">Preparing review…</h1>
+				<p id="running-detail">Reading the diff</p>
+				<div class="progress-track"><span id="progress-bar"></span></div>
+			</section>
+
+			<section class="review-hero" id="review-hero" hidden>
+				<div class="hero-copy">
+					<p class="eyebrow" id="pr-identity"></p>
+					<h1 id="pr-title"></h1>
+				</div>
+				<div class="omitted-count" aria-label="Files omitted">
+					<strong id="omitted-count">0</strong><span>files omitted</span>
+				</div>
+			</section>
+
+			<section class="review-layout" id="review-layout" hidden>
+				<aside><nav id="file-nav" aria-label="Selected files"></nav></aside>
+				<div class="diff-stack" id="diff-stack"></div>
+			</section>
+
+			<section class="empty-state" id="empty-state" hidden>
+				<h1 id="empty-title">Run Beef on a pull request first.</h1>
+				<p id="empty-copy">No saved review.</p>
+			</section>
+		</main>
+
+		<script type="module" src="app.js"></script>
+	</body>
+</html>
